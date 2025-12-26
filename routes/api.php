@@ -10,4 +10,4 @@ Route::middleware(['auth:sanctum'])->get('/user', function (Request $request) {
 });
 
 Route::get('/preview', [LinkPreviewController::class, 'preview']);
-Route::resource('/note', NoteController::class);
+Route::resource('/notes', NoteController::class);

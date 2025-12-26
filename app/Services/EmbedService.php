@@ -16,7 +16,7 @@ class EmbedService
         'url' => $url,
         'title' => $info->title ?? null,
         'desc' => $info->description ?? null,
-        'image' => $info->image ?? null,
+        'image_url' => $info->image ?? null,
         'provider_name' => $info->providerName ?? null,
       ];
     } catch (\Throwable $e) {

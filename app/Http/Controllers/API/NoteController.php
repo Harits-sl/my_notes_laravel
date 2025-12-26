@@ -40,31 +40,23 @@ class NoteController extends Controller
         }
 
         $data = $this->embedService->getMetaData($url);
-
         // jika data dari instagram
-        // maka redirect ke /media?size=m untuk mengambil full image
         if ($data['provider_name'] == 'Instagram') {
             $parsedUrl = parse_url($url);
-            // Ambil bagian path-nya (misal: "/p/DQ4ROThCdu1/")
-            $base = rtrim($parsedUrl['scheme'] . '://' . $parsedUrl['host'] . $parsedUrl['path'], '/');
+            $segments = explode('/', trim($parsedUrl['path'], '/')); // hasil: ['reel atau p', 'DO1KzZsEZEw']
+            $type = $segments[0] ?? null; // 'reel' atau 'p' atau 's'
 
-            $response = Http::withOptions(['allow_redirects' => true, 'on_stats' => function ($stats) use (&$finalUrl) {
-                // Ambil final URI setelah request selesai
-                $finalUrl = (string) $stats->getEffectiveUri();
-            },])
-                ->withHeaders([
-                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-                ])
-                ->get($base . '/media?size=m');
-
-            $responseFinalUrl = Http::get($finalUrl);
-
-            // ubah data image ke filename
-            $data['image'] = $this->saveImage($responseFinalUrl->body());
+            // jika tipe instagram p redirect ke /media?size=m untuk mengambil full image
+            // jika tidak langsung save image dari metadata
+            if ($type == 'p') {
+                // ubah data image ke filename
+                $data['image'] = $this->saveImage($this->getFullImageInstagram($parsedUrl));
+            } else {
+                $data['image'] = $this->saveImage($data['image']);
+            }
         } else {
-            $response = Http::get($data['image']);
             // ubah data image ke filename
-            $data['image'] = $this->saveImage($response->body());
+            $data['image'] = $this->saveImage($data['image']);
         }
 
         Note::create($data);
@@ -95,13 +87,30 @@ class NoteController extends Controller
         //
     }
 
-    private function saveImage($image)
+    private function saveImage($url)
     {
+        $response = Http::get($url);
         // Tentukan nama file unik
         $filename = hash('md5', Str::random(20)) . '.jpg';
         // Simpan ke folder public/storage/images
-        Storage::disk('public')->put('images/' . $filename, $image);
+        Storage::disk('public')->put('images/' . $filename, $response->body());
 
         return $filename;
+    }
+
+    private function getFullImageInstagram($parsedUrl)
+    {
+        // Ambil bagian path-nya (misal: "/p/DQ4ROThCdu1/")
+        $base = rtrim($parsedUrl['scheme'] . '://' . $parsedUrl['host'] . $parsedUrl['path'], '/');
+        $response = Http::withOptions(['allow_redirects' => true, 'on_stats' => function ($stats) use (&$finalUrl) {
+            // Ambil final URI setelah request selesai
+            $finalUrl = (string) $stats->getEffectiveUri();
+        },])
+            ->withHeaders([
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            ])
+            ->get($base . '/media?size=m');
+
+        return $finalUrl;
     }
 }
