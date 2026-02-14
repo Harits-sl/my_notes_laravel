@@ -27,7 +27,7 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           port: 21
-          server-dir: ~/domains/haritssl.my.id/public_html/notes_app/my_notes_laravel/
+          server-dir: /domains/haritssl.my.id/public_html/notes_app/my_notes_laravel/
           exclude: |
             **/.git*
             **/.github*
@@ -43,7 +43,7 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           port: 21
-          server-dir: ~/domains/haritssl.my.id/public_html/notes_app/dev_my_notes_laravel/
+          server-dir: /domains/haritssl.my.id/public_html/notes_app/dev_my_notes_laravel/
           exclude: |
             **/.git*
             **/.github*
