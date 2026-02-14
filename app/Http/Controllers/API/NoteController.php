@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Note\StoreNoteRequest;
+use App\Http\Resources\NoteResource;
+use App\Http\Responses\ApiResponse;
 use App\Models\Note;
 use App\Services\EmbedService;
 use Illuminate\Http\Request;
@@ -24,43 +27,39 @@ class NoteController extends Controller
      */
     public function index()
     {
-        $data = Note::get();
-        return response()->json($data);
+        $notes = Note::with('categories')->latest()->get();
+
+        return NoteResource::collection($notes);
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StoreNoteRequest $request)
     {
-        $url = $request->input('url');
-
-        if (!$url) {
-            return response()->json(['error' => 'URL tidak ditemukan'], 400);
+        if ($request->image_url !== null) {
+            $this->saveImage($request->image_url);
         }
 
-        $data = $this->embedService->getMetaData($url);
-        // jika data dari instagram
-        if ($data['provider_name'] == 'Instagram') {
-            $parsedUrl = parse_url($url);
-            $segments = explode('/', trim($parsedUrl['path'], '/')); // hasil: ['reel atau p', 'DO1KzZsEZEw']
-            $type = $segments[0] ?? null; // 'reel' atau 'p' atau 's'
+        $note = Note::create([
+            'url'         => $request->url,
+            'title'       => $request->title,
+            'description' => $request->description,
+            'image_url'   => $request->image_url,
+        ]);
 
-            // jika tipe instagram p redirect ke /media?size=m untuk mengambil full image
-            // jika tidak langsung save image dari metadata
-            if ($type == 'p') {
-                // ubah data image ke filename
-                $data['image'] = $this->saveImage($this->getFullImageInstagram($parsedUrl));
-            } else {
-                $data['image'] = $this->saveImage($data['image']);
-            }
-        } else {
-            // ubah data image ke filename
-            $data['image'] = $this->saveImage($data['image']);
-        }
+        // sync categories
+        $categoryIds = $this->resolveCategories(
+            $request->input('categories', [])
+        );
 
-        Note::create($data);
-        return response()->json($data);
+        $note->categories()->sync($categoryIds);
+
+        return ApiResponse::success(
+            new NoteResource($note->load('categories')),
+            'Note berhasil disimpan',
+            201
+        );
     }
 
     /**
@@ -82,11 +81,33 @@ class NoteController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Note $note)
+    public function destroy(int $id)
     {
-        //
+        Note::findOrFail($id)->delete();
+
+        return response()->noContent();
     }
 
+    /**
+     * Download dan simpan gambar dari URL ke storage publik.
+     *
+     * Function ini akan:
+     * - Mengambil file gambar dari URL menggunakan HTTP client Laravel
+     * - Membuat nama file unik menggunakan hash MD5
+     * - Menyimpan gambar ke folder `storage/app/public/images`
+     *
+     * Pastikan:
+     * - URL yang diberikan valid dan dapat diakses publik
+     *
+     * @param  string  $url
+     *         URL gambar yang akan diunduh dan disimpan
+     *
+     * @return string
+     *         Nama file gambar yang berhasil disimpan
+     *
+     * @throws \Illuminate\Http\Client\RequestException
+     *         Jika request HTTP ke URL gagal
+     */
     private function saveImage($url)
     {
         $response = Http::get($url);
@@ -98,19 +119,61 @@ class NoteController extends Controller
         return $filename;
     }
 
-    private function getFullImageInstagram($parsedUrl)
+    /**
+     * Resolve dan normalisasi daftar kategori (existing & new).
+     *
+     * Method ini menerima payload kategori dari request, lalu:
+     * - Menggunakan ID jika kategori sudah ada
+     * - Membuat kategori baru jika ID kosong tapi memiliki nama
+     * - Mengabaikan data yang tidak valid
+     * - Menghapus duplikasi ID kategori
+     *
+     * Contoh payload:
+     * [
+     *   ['id' => 1, 'name' => 'Backend'],
+     *   ['id' => null, 'name' => 'Laravel'],
+     *   ['id' => 2],
+     * ]
+     *
+     * Hasil:
+     * [
+     *   1,
+     *   3, // ID kategori "Laravel" yang baru dibuat
+     *   2
+     * ]
+     *
+     * @param  array<int, array{id?: int|null, name?: string|null}>  $categories
+     *         Daftar kategori dari request
+     *
+     * @return array<int, int>
+     *         Array ID kategori yang valid dan unik
+     */
+    protected function resolveCategories(array $categories): array
     {
-        // Ambil bagian path-nya (misal: "/p/DQ4ROThCdu1/")
-        $base = rtrim($parsedUrl['scheme'] . '://' . $parsedUrl['host'] . $parsedUrl['path'], '/');
-        $response = Http::withOptions(['allow_redirects' => true, 'on_stats' => function ($stats) use (&$finalUrl) {
-            // Ambil final URI setelah request selesai
-            $finalUrl = (string) $stats->getEffectiveUri();
-        },])
-            ->withHeaders([
-                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-            ])
-            ->get($base . '/media?size=m');
+        return collect($categories)
+            ->filter(fn($category) => is_array($category))
+            ->map(function ($category) {
 
-        return $finalUrl;
+                // 1️⃣ Existing category (ID takes precedence)
+                if (!empty($category['id'])) {
+                    return (int) $category['id'];
+                }
+
+                // 2️⃣ New category (create if name exists)
+                if (!empty($category['name'])) {
+                    $name = ucfirst(strtolower(trim($category['name'])));
+
+                    return Category::firstOrCreate([
+                        'name' => $name,
+                    ])->id;
+                }
+
+                // 3️⃣ Invalid category payload
+                return null;
+            })
+            ->filter()   // Remove null values
+            ->unique()   // Remove duplicate IDs
+            ->values()   // Reindex array
+            ->toArray();
     }
 }

@@ -23,6 +23,14 @@ class Note extends Model
 
     protected $appends = ['image_url'];
 
+    public function categories()
+    {
+        return $this->belongsToMany(
+            Category::class,
+            'notes_category'
+        )->withTimestamps();
+    }
+
     protected function imageUrl(): Attribute
     {
         return Attribute::make(

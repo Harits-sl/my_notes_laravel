@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use Embed\Embed;
 use Illuminate\Foundation\Http\FormRequest;
 
 class EmbedRequest extends FormRequest

@@ -2,28 +2,29 @@
 
 namespace App\Services;
 
+use App\DTOs\LinkPreviewDTO;
 use Embed\Embed;
 
 class EmbedService
 {
-  public function getMetaData(string $url): array
+  public function getMetaData(string $url): LinkPreviewDTO
   {
     try {
       $embed = new Embed();
       $info = $embed->get($url);
 
-      return [
-        'url' => $url,
-        'title' => $info->title ?? null,
-        'desc' => $info->description ?? null,
-        'image_url' => $info->image ?? null,
-        'provider_name' => $info->providerName ?? null,
-      ];
+      return new LinkPreviewDTO(
+        url: $url,
+        title: $info->title ?? null,
+        description: $info->description ?? null,
+        image_url: $info->image ?? null,
+        provider_name: $info->providerName ?? null,
+      );
     } catch (\Throwable $e) {
-      return [
-        'error' => 'Gagal mengambil metadata',
-        'detail' => $e->getMessage(),
-      ];
+      throw new \RuntimeException(
+        'Gagal mengambil metadata',
+        previous: $e
+      );
     }
   }
 }
