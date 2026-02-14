@@ -30,7 +30,7 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           port: 21
-          server-dir: ~/domains/haritssl.my.id/public_html/notes_app/my_notes_laravel
+          server-dir: ~/domains/haritssl.my.id/public_html/notes_app/my_notes_laravel/
 
       - name: Deploy to Development
         if: github.ref == 'refs/heads/dev'
@@ -40,4 +40,4 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           port: 21
-          server-dir: ~/domains/haritssl.my.id/public_html/notes_app/dev_my_notes_laravel
+          server-dir: ~/domains/haritssl.my.id/public_html/notes_app/dev_my_notes_laravel/
