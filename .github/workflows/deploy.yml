@@ -35,6 +35,7 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT }}
           script: |
+            whoami
             cd ~/domains/haritssl.my.id/public_html/notes_app/dev_my_notes_laravel
             git pull origin dev
             php artisan migrate --force
